@@ -1,0 +1,247 @@
+<?php
+function tasker_menu() {
+	$items = array();
+	$items['node/%node/tasker'] = array(
+		'title' => 'Tasker',
+		'page arguments' => array('tasker_tasks', 1),
+		'page callback' => 'drupal_get_form',
+		'access arguments' => array('tasker node task manage'),
+		'type' => MENU_LOCAL_TASK,
+		'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+	);
+	$items['tasker/delete/%'] = array(
+		'page arguments' => array(2),
+		'page callback' => '_tasker_delete_task',
+		'access arguments' => array('tasker node task manage'),
+		'type' => MENU_CALLBACK,
+	);
+	
+	return $items;
+}
+function tasker_admin_paths() {
+  $paths = array(
+    'node/*/tasker' => TRUE,
+    'tasker/*' => TRUE,
+  );
+  return $paths;
+}
+function tasker_permission() {
+	return array(
+		'tasker node task manage' => array(
+			'title' => t('Manage node tasks'),
+		),
+	);
+}
+function tasker_cron() {
+	//Cron tasks
+	$query = db_select('tasker_tasks','tt')
+		->condition('tt.status',0)
+		->condition('tt.date',time(),'<')
+		->fields('tt');
+	$results = $query->execute()->fetchAll();
+	
+	foreach($results AS $result) {
+		$type = $result->type;
+		$task = new $type;
+		$task->nid = $result->nid;
+		if($task->execute()) {
+			db_update('tasker_tasks')
+				->fields(array('status' => 1))
+				->condition('id', $result->id)
+				->execute();
+		}
+	}
+}
+
+function tasker_tasks($form, $form_state, $node) {
+	//debug($node);
+	$header = array(
+		'ID',
+		t('Date'),
+		t('Type'),
+		t('Done'),
+		t('Delete'),
+	);
+	$rows = array();
+	$query = db_select('tasker_tasks','tt');
+	$query->condition('tt.nid',$node->nid)
+		->orderBy('tt.date')
+		->fields('tt');
+	$results = $query->execute()->fetchAll();
+	foreach($results AS $result) {
+		$rows[] = array(
+			$result->id,
+			format_date($result->date),
+			$result->type,
+			$result->status?t('Done'):t('Pending'),
+			l(t('Delete'),'tasker/delete/'.$result->id,array('query' => drupal_get_destination(), 'attributes'=>array('onclick' => 'if(!confirm("'.t('Confirm').'")){return false;}'))),
+		);
+	}
+	$table = theme('table', 
+				array(
+					'header' => $header,
+					'rows'=> $rows,
+					'sticky' => TRUE,
+					'empty' => t('No tasks'),
+				)
+			);
+			
+	$form['table'] = array(
+		'#type' => 'markup',
+		'#markup' => $table,
+	);
+	
+	$form['add'] = array(
+		'#type' => 'fieldset',
+		'#title' => t('Add'),
+		'#collapsible' => TRUE,
+		'#collapsed' => TRUE,
+	);
+	$form['add'] = _tasker_task_add_form($form['add'], $form_state, $node->nid);
+	return $form;
+}
+function tasker_tasks_submit($form, $form_state) {
+	$fields = array(
+		'nid' => $form_state['values']['nid'],
+		'date' => strtotime($form_state['values']['date'].':00'),
+		'type' => $form_state['values']['type'],
+		'status' => 0,
+	);
+	drupal_write_record('tasker_tasks',$fields);
+}
+function _tasker_task_add_form($form, $form_state, $nid) {
+	$format = 'dmY H';
+	$form['task_add'] = array(
+		'type' => array(
+			'#type' => 'select',
+			'#title' => t('Task'),
+			'#options' => _tasker_get_options(FALSE),
+		),
+		'date' => array(
+			'#type' => 'date_select',
+			'#title' => t('Date'),
+			'#date_format' => $format,
+			'#date_label_position' => 'above',
+			'#default_value' => date($format, time()),
+			'#date_increment' => 60,
+			'#date_year_range' => '0:+3',
+		),
+		'nid' => array(
+			'#type' => 'hidden',
+			'#value' => $nid,
+		),
+	);
+	$form['actions']['submit'] = array(
+		'#type' => 'submit',
+		'#value' => t('Add'),
+	);
+	
+	return $form;
+}
+
+function _tasker_get_options() {
+	$array = array();
+	foreach(getSubclasses('Tasker') AS $key => $class) {
+		$temp = new $class;
+		$array[$class] = $temp->title;
+	}
+	return $array;
+}
+function getSubclasses($parentClassName) {
+    $classes = array();
+    foreach (get_declared_classes() as $className)
+    {
+    	if (is_subclass_of($className, $parentClassName))
+    		$classes[] = $className;
+    }
+
+    return $classes;
+}
+function _tasker_delete_task($id) {
+	if(db_delete('tasker_tasks')->condition('id',$id)->execute())
+		drupal_set_message(t('Tasker task deleted'));
+	drupal_goto();
+}
+
+class Tasker {
+	var $nid = 0;
+	var $title = '';
+}
+class publish extends Tasker {
+	function publish() {
+		$this->title = t('Publish content');
+	}
+	function execute() {
+		$node = node_load($this->nid);
+		$node->status = 1;
+		$node->revision = TRUE;
+		$node->log = t('Node published by Tasker');
+		node_save($node);
+		return TRUE;
+	}
+}
+class unpublish extends Tasker {
+	function unpublish() {
+		$this->title = t('Unpublish content');
+	}
+	function execute() {
+		$node = node_load($this->nid);
+		$node->status = 0;
+		$node->revision = TRUE;
+		$node->log = t('Node unpublished by Tasker');
+		node_save($node);
+		return TRUE;
+	}
+}
+class sticky extends Tasker {
+	function sticky() {
+		$this->title = t('Make content sticky');
+	}
+	function execute() {
+		$node = node_load($this->nid);
+		$node->sticky = 1;
+		$node->revision = TRUE;
+		$node->log = t('Stick by Tasker');
+		node_save($node);
+		return TRUE;
+	}
+}
+class unsticky extends Tasker {
+	function unsticky() {
+		$this->title = t('Make content unsticky');
+	}
+	function execute() {
+		$node = node_load($this->nid);
+		$node->sticky = 0;
+		$node->revision = TRUE;
+		$node->log = t('Unstick by Tasker');
+		node_save($node);
+		return TRUE;
+	}
+}
+class promote extends Tasker {
+	function promote() {
+		$this->title = t('Promote selected content to front page');
+	}
+	function execute() {
+		$node = node_load($this->nid);
+		$node->promote = 1;
+		$node->revision = TRUE;
+		$node->log = t('Promoted by Tasker');
+		node_save($node);
+		return TRUE;
+	}
+}
+class unpromote extends Tasker {
+	function unpromote() {
+		$this->title = t('Demote selected content from front page');
+	}
+	function execute() {
+		$node = node_load($this->nid);
+		$node->promote = 0;
+		$node->revision = TRUE;
+		$node->log = t('Deleted from front page by Tasker');
+		node_save($node);
+		return TRUE;
+	}
+}

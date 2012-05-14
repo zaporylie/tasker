@@ -1,0 +1,15 @@
+<?php
+function tasker_schema() {
+	$schema['tasker_tasks'] = array(
+		'descrition' => 'Table of tasks',
+		'fields' => array(
+			'id' => array('type' => 'serial', 'not null' => TRUE),
+			'nid' => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
+			'date' => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
+			'type' => array('type' => 'varchar', 'length' => '100', 'not null' => TRUE, 'default' => ''),
+			'status' => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
+		),
+		'primary key' => array('id'),
+	);
+	return $schema;
+}

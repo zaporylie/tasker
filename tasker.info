@@ -1,0 +1,11 @@
+name = Tasker
+description = "Module to manage tasks in Drupal"
+core = "7.x"
+package = Z CIRS
+
+files[] = tasker.module
+files[] = tasker.info
+files[] = tasker.install
+
+dependencies[] = date
+dependencies[] = options
