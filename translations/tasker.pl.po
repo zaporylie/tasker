@@ -1,7 +1,7 @@
 # $Id$
 #
 # Polish translation of Drupal (general)
-# Copyright Jakub Piasecki <jakub@piaseccy.pl>
+# Copyright Centrum Informacji i Rozwoju Społecznego
 # Generated from files:
 #  tasker.module: n/a
 #  tasker.info: n/a
@@ -10,8 +10,8 @@ msgid ""
 msgstr ""
 "POT-Creation-Date: 2012-05-14 19:34+0200\n"
 "PO-Revision-Date: 2012-05-14 19:39+0100\n"
-"Last-Translator: Jakub Piasecki <jakub@piaseccy.pl>\n"
-"Language-Team: Polish <EMAIL@ADDRESS>\n"
+"Last-Translator: zaporylie <jakub@piaseccy.pl>\n"
+"Language-Team: Polish\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
